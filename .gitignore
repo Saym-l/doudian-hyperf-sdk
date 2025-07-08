@@ -1,0 +1,44 @@
+# Composer
+/vendor/
+composer.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+/coverage/
+.phpunit.result.cache
+
+# Logs
+*.log
+/logs/
+
+# Runtime
+/runtime/
+/storage/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# PHPUnit
+phpunit.xml
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Temporary files
+*.tmp
+*.temp
+/scripts 
+PUBLISH_GUIDE.md
