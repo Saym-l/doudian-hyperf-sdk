@@ -67,6 +67,16 @@ class Config
         return $this->config[$key] ?? $default;
     }
 
+    public function getServiceId(): string
+    {
+        return $this->config['service_id'] ?? '';
+    }
+
+    public function getProxy()
+    {
+        return $this->config['proxy'] ?? null;
+    }
+
     protected function validateConfig(): void
     {
         if (empty($this->config['app_key'])) {

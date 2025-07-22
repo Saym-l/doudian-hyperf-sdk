@@ -27,7 +27,7 @@ class ClientFactory implements ClientFactoryInterface
     {
         if (!isset($this->clients[$name])) {
             $config = new Config($this->container, $name);
-            $httpClient = $this->container->get(HttpClientInterface::class);
+            $httpClient = new \Doudian\Core\Http\CoroutineHttpClient($this->container, $config);
             $this->clients[$name] = new DoudianClient($httpClient, $config);
         }
 

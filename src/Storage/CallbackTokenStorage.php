@@ -39,7 +39,7 @@ class CallbackTokenStorage implements TokenStorageInterface
      * @param array $tokenData 令牌数据
      * @return bool
      */
-    public function store(string $shopId, array $tokenData): bool
+    public function store(int $shopId, array $tokenData, string $clientName = 'default'): bool
     {
         return call_user_func($this->storeCallback, $shopId, $tokenData);
     }
@@ -50,7 +50,7 @@ class CallbackTokenStorage implements TokenStorageInterface
      * @param string $shopId 商家ID
      * @return array|null 返回令牌数据或 null
      */
-    public function get(string $shopId): ?array
+    public function get(int $shopId, string $clientName = 'default'): ?array
     {
         return call_user_func($this->getCallback, $shopId);
     }
@@ -58,10 +58,10 @@ class CallbackTokenStorage implements TokenStorageInterface
     /**
      * 删除访问令牌信息
      * 
-     * @param string $shopId 商家ID
+     * @param int $shopId 商家ID
      * @return bool
      */
-    public function delete(string $shopId): bool
+    public function delete(int $shopId, string $clientName = 'default'): bool
     {
         return call_user_func($this->deleteCallback, $shopId);
     }
@@ -71,7 +71,7 @@ class CallbackTokenStorage implements TokenStorageInterface
      * 
      * @return array 商家列表，key 为 shop_id，value 为商家信息
      */
-    public function list(): array
+    public function list(string $clientName = 'default'): array
     {
         if ($this->listCallback) {
             return call_user_func($this->listCallback);
@@ -84,10 +84,10 @@ class CallbackTokenStorage implements TokenStorageInterface
     /**
      * 检查商家是否已授权
      * 
-     * @param string $shopId 商家ID
+     * @param int $shopId 商家ID
      * @return bool
      */
-    public function exists(string $shopId): bool
+    public function exists(int $shopId, string $clientName = 'default'): bool
     {
         if ($this->existsCallback) {
             return call_user_func($this->existsCallback, $shopId);

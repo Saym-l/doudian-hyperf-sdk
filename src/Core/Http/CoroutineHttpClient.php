@@ -14,21 +14,31 @@ use Psr\Container\ContainerInterface;
 class CoroutineHttpClient implements HttpClientInterface
 {
     protected Client $client;
+    protected $proxy;
 
-    public function __construct(ContainerInterface $container)
+    public function __construct(ContainerInterface $container, ?\Doudian\Core\Config $config = null)
     {
         $clientFactory = $container->get(ClientFactory::class);
-        $this->client = $clientFactory->create();
+        $options = [];
+        if ($config && $config->getProxy()) {
+            $options['proxy'] = $config->getProxy();
+            $this->proxy = $config->getProxy();
+        }
+        $this->client = $clientFactory->create($options);
     }
 
     public function get(HttpRequest $request): HttpResponse
     {
         try {
-            $response = $this->client->get($request->url, [
+            $options = [
                 RequestOptions::HEADERS => $this->buildHeaders($request->headers),
                 RequestOptions::TIMEOUT => $request->readTimeout,
                 RequestOptions::CONNECT_TIMEOUT => $request->connectTimeout,
-            ]);
+            ];
+            if ($this->proxy) {
+                $options['proxy'] = $this->proxy;
+            }
+            $response = $this->client->get($request->url, $options);
 
             return new HttpResponse(
                 $response->getStatusCode(),
@@ -59,6 +69,10 @@ class CoroutineHttpClient implements HttpClientInterface
 
             if (!empty($request->body)) {
                 $options[RequestOptions::BODY] = $request->body;
+            }
+
+            if ($this->proxy) {
+                $options['proxy'] = $this->proxy;
             }
 
             $response = $this->client->post($request->url, $options);
@@ -92,6 +106,10 @@ class CoroutineHttpClient implements HttpClientInterface
 
             if (!empty($request->body)) {
                 $options[RequestOptions::BODY] = $request->body;
+            }
+
+            if ($this->proxy) {
+                $options['proxy'] = $this->proxy;
             }
 
             $response = $this->client->put($request->url, $options);

@@ -76,7 +76,7 @@ class AccessToken
         return null;
     }
 
-    public function getShopId(): ?string
+    public function getShopId(): ?int
     {
         if ($this->data !== null && property_exists($this->data, 'shop_id')) {
             return $this->data->shop_id;

@@ -14,7 +14,7 @@ use Psr\Container\ContainerInterface;
  */
 class ImprovedRedisTokenStorage implements TokenStorageInterface
 {
-    protected \Redis $redis;
+    protected  $redis;
     protected string $keyPrefix;
     protected int $defaultTtl;
     protected int $bufferTime; // 刷新缓冲时间
@@ -36,7 +36,7 @@ class ImprovedRedisTokenStorage implements TokenStorageInterface
     /**
      * 存储访问令牌信息
      */
-    public function store(string $shopId, array $tokenData): bool
+    public function store(int $shopId, array $tokenData, string $clientName = 'default'): bool
     {
         try {
             $key = $this->getTokenKey($shopId);
@@ -88,7 +88,7 @@ class ImprovedRedisTokenStorage implements TokenStorageInterface
     /**
      * 获取访问令牌信息
      */
-    public function get(string $shopId): ?array
+    public function get(int $shopId, string $clientName = 'default'): ?array
     {
         try {
             $key = $this->getTokenKey($shopId);
@@ -124,7 +124,7 @@ class ImprovedRedisTokenStorage implements TokenStorageInterface
     /**
      * 删除访问令牌信息
      */
-    public function delete(string $shopId): bool
+    public function delete(int $shopId, string $clientName = 'default'): bool
     {
         try {
             $pipe = $this->redis->multi(\Redis::PIPELINE);
@@ -154,7 +154,7 @@ class ImprovedRedisTokenStorage implements TokenStorageInterface
     /**
      * 获取所有已授权的商家列表
      */
-    public function list(): array
+    public function list(string $clientName = 'default'): array
     {
         try {
             $shopListKey = $this->getShopListKey();
@@ -200,7 +200,7 @@ class ImprovedRedisTokenStorage implements TokenStorageInterface
     /**
      * 检查商家是否已授权
      */
-    public function exists(string $shopId): bool
+    public function exists(int $shopId, string $clientName = 'default'): bool
     {
         try {
             $key = $this->getTokenKey($shopId);
@@ -308,9 +308,9 @@ class ImprovedRedisTokenStorage implements TokenStorageInterface
 
     // ===== 私有辅助方法 =====
 
-    protected function getTokenKey(string $shopId): string
+    protected function getTokenKey(int $shopId, string $clientName = 'default'): string
     {
-        return $this->keyPrefix . $shopId;
+        return $this->keyPrefix . $clientName . ':' . $shopId;
     }
 
     protected function getHashKey(): string
@@ -323,7 +323,7 @@ class ImprovedRedisTokenStorage implements TokenStorageInterface
         return $this->keyPrefix . 'shops';
     }
 
-    protected function getShopInfoKey(string $shopId): string
+    protected function getShopInfoKey(int $shopId): string
     {
         return $this->keyPrefix . 'info:' . $shopId;
     }
@@ -342,7 +342,7 @@ class ImprovedRedisTokenStorage implements TokenStorageInterface
         return $expiresIn + $this->bufferTime; // 加上缓冲时间
     }
 
-    protected function checkAndUpdateExpiry(string $shopId, array $tokenData): void
+    protected function checkAndUpdateExpiry(int $shopId, array $tokenData): void
     {
         $expiresAt = $tokenData['expires_at'] ?? 0;
         $timeToExpiry = $expiresAt - time();

@@ -30,7 +30,6 @@ class AccessTokenBuilder
         
         $request->setParam($param);
         $resp = $request->execute(null, $clientName);
-        
         return AccessToken::wrap($resp);
     }
 

@@ -28,33 +28,29 @@ class ToolAppManager
     /**
      * 生成授权链接
      */
-    public function generateAuthUrl(string $redirectUri, string $state = '', string $clientName = 'default'): string
+    public function generateAuthUrl(string $state = '', string $clientName = 'default'): string
     {
         $client = $this->clientFactory->get($clientName);
         $config = $client->getConfig();
-        
-        $params = [
-            'app_key' => $config->getAppKey(),
-            'response_type' => 'code',
-            'redirect_uri' => $redirectUri,
-            'state' => $state ?: $this->generateState(),
-            'scope' => 'trade_basic,product_basic', // 根据需要调整权限范围
-        ];
-
+        $params=[
+            'service_id' => $config->getServiceId(),
+            'state' => $state,
+           
+        ];   
         $queryString = http_build_query($params);
-        return 'https://openapi-fxg.jinritemai.com/oauth/authorize?' . $queryString;
+        return 'https://fuwu.jinritemai.com/authorize?' . $queryString;
     }
 
     /**
      * 处理授权回调，获取访问令牌
      */
-    public function handleAuthCallback(string $code, string $shopId = '', string $clientName = 'default'): AccessToken
+    public function handleAuthCallback(string $code, string $clientName = 'default'): AccessToken
     {
         $accessToken = AccessTokenBuilder::build($code, AccessTokenBuilder::ACCESS_TOKEN_CODE, $clientName);
         
         if ($accessToken->isSuccess() && $this->tokenStorage) {
             // 存储令牌信息
-            $this->tokenStorage->store($shopId ?: $accessToken->getShopId(), [
+            $this->tokenStorage->store($accessToken->getShopId(), [
                 'access_token' => $accessToken->getAccessToken(),
                 'refresh_token' => $accessToken->getRefreshToken(),
                 'expires_in' => $accessToken->getExpireIn(),
@@ -63,29 +59,28 @@ class ToolAppManager
                 'shop_name' => $accessToken->getShopName(),
                 'scope' => $accessToken->getScope(),
                 'created_at' => time(),
-            ]);
+            ], $clientName);
         }
         
         return $accessToken;
     }
-
     /**
      * 获取商家的有效访问令牌
      */
-    public function getShopAccessToken(string $shopId): ?AccessToken
+    public function getShopAccessToken(int $shopId, string $clientName = 'default'): ?AccessToken
     {
         if (!$this->tokenStorage) {
             throw new \RuntimeException('TokenStorage not configured');
         }
 
-        $tokenData = $this->tokenStorage->get($shopId);
+        $tokenData = $this->tokenStorage->get($shopId, $clientName);
         if (!$tokenData) {
             return null;
         }
 
         // 检查令牌是否过期
         if ($tokenData['expires_at'] <= time() + 300) { // 提前5分钟刷新
-            return $this->refreshShopAccessToken($shopId);
+            return $this->refreshShopAccessToken($shopId, $clientName);
         }
 
         return AccessTokenBuilder::parse($tokenData['access_token']);
@@ -94,13 +89,13 @@ class ToolAppManager
     /**
      * 刷新商家访问令牌
      */
-    public function refreshShopAccessToken(string $shopId, string $clientName = 'default'): ?AccessToken
+    public function refreshShopAccessToken(int $shopId, string $clientName = 'default'): ?AccessToken
     {
         if (!$this->tokenStorage) {
             throw new \RuntimeException('TokenStorage not configured');
         }
 
-        $tokenData = $this->tokenStorage->get($shopId);
+        $tokenData = $this->tokenStorage->get($shopId, $clientName);
         if (!$tokenData || !$tokenData['refresh_token']) {
             return null;
         }
@@ -119,13 +114,19 @@ class ToolAppManager
                     'shop_name' => $newAccessToken->getShopName(),
                     'scope' => $newAccessToken->getScope(),
                     'updated_at' => time(),
-                ]);
-                
+                ], $clientName);
+
+                // 发布 token 刷新事件
+                if (class_exists('Hyperf\\Event\\EventDispatcher')) {
+                    $container = \Hyperf\Context\ApplicationContext::getContainer();
+                    $eventDispatcher = $container->get(\Hyperf\Event\EventDispatcher::class);
+                    $eventDispatcher->dispatch(new \Doudian\Core\DoudianTokenRefreshedEvent($shopId, $clientName, $newAccessToken));
+                }
                 return $newAccessToken;
             }
         } catch (\Exception $e) {
             // 刷新失败，可能需要重新授权
-            $this->tokenStorage->delete($shopId);
+            $this->tokenStorage->delete($shopId, $clientName);
         }
 
         return null;
@@ -134,10 +135,10 @@ class ToolAppManager
     /**
      * 撤销商家授权
      */
-    public function revokeShopAuth(string $shopId): bool
+    public function revokeShopAuth(int $shopId, string $clientName = 'default'): bool
     {
         if ($this->tokenStorage) {
-            return $this->tokenStorage->delete($shopId);
+            return $this->tokenStorage->delete($shopId, $clientName);
         }
         
         return false;
@@ -146,13 +147,13 @@ class ToolAppManager
     /**
      * 获取所有已授权的商家列表
      */
-    public function getAuthorizedShops(): array
+    public function getAuthorizedShops(string $clientName = 'default'): array
     {
         if (!$this->tokenStorage) {
             return [];
         }
 
-        return $this->tokenStorage->list();
+        return $this->tokenStorage->list($clientName);
     }
 
     /**
@@ -192,13 +193,13 @@ class ToolAppManager
     /**
      * 获取商家信息
      */
-    public function getShopInfo(string $shopId): ?array
+    public function getShopInfo(int $shopId, string $clientName = 'default'): ?array
     {
         if (!$this->tokenStorage) {
             return null;
         }
 
-        $tokenData = $this->tokenStorage->get($shopId);
+        $tokenData = $this->tokenStorage->get($shopId, $clientName);
         if (!$tokenData) {
             return null;
         }
@@ -212,5 +213,80 @@ class ToolAppManager
             'expires_at' => $tokenData['expires_at'],
             'is_expired' => $tokenData['expires_at'] <= time(),
         ];
+    }
+
+    /**
+     * 手动保存/更新商家 token
+     */
+    public function saveShopToken(int $shopId, array $tokenData, string $clientName = 'default'): bool
+    {
+        if (!$this->tokenStorage) {
+            throw new \RuntimeException('TokenStorage not configured');
+        }
+        return $this->tokenStorage->store($shopId, $tokenData, $clientName);
+    }
+
+    /**
+     * 自动重试请求，支持 token 及常规错误码重试
+     */
+    public function requestWithRetry(
+        DoudianClient $client,
+        \Doudian\Core\Contract\RequestInterface $request,
+        int $shopId,
+        string $clientName = 'default'
+    ) {
+        $config = $client->getConfig();
+        $retryConfig = $config->get('retry', []);
+        $maxAttempts = $retryConfig['max_attempts'] ?? 2;
+        $intervalMs = $retryConfig['interval_ms'] ?? 200;
+        $retryCodes = $retryConfig['retry_codes'] ?? [40006, 40007, 40009];
+        $retryOnNetworkError = $retryConfig['retry_on_network_error'] ?? true;
+
+        $attempt = 0;
+        $lastResponse = null;
+        $lastException = null;
+
+        while ($attempt < $maxAttempts) {
+            $attempt++;
+            try {
+                $accessToken = $this->getShopAccessToken($shopId, $clientName);
+                $response = $client->request($request, $accessToken);
+
+                // 判断是否需要重试
+                if (isset($response->code) && in_array($response->code, $retryCodes)) {
+                    // token 相关错误，自动刷新
+                    if (in_array($response->code, [40006, 40007, 40009])) {
+                        $this->refreshShopAccessToken($shopId, $clientName);
+                    }
+                    if ($attempt < $maxAttempts) {
+                        usleep($intervalMs * 1000);
+                        continue;
+                    }
+                }
+                $lastResponse = $response;
+                break;
+            } catch (\GuzzleHttp\Exception\RequestException $e) {
+                $lastException = $e;
+                if ($retryOnNetworkError && $attempt < $maxAttempts) {
+                    usleep($intervalMs * 1000);
+                    continue;
+                }
+                throw $e;
+            } catch (\Throwable $e) {
+                $lastException = $e;
+                if ($retryOnNetworkError && $attempt < $maxAttempts) {
+                    usleep($intervalMs * 1000);
+                    continue;
+                }
+                throw $e;
+            }
+        }
+        if ($lastResponse !== null) {
+            return $lastResponse;
+        }
+        if ($lastException !== null) {
+            throw $lastException;
+        }
+        return null;
     }
 } 
