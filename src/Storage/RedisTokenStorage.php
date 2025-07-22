@@ -27,7 +27,7 @@ class RedisTokenStorage implements TokenStorageInterface
         
         // 设置过期时间比实际令牌过期时间长一些，用于刷新令牌
         $ttl = $tokenData['expires_in'] ?? 7200;
-        $ttl += 86400; // 多保存1天用于刷新
+        $ttl += 86400*14; // 多保存14天用于刷新
         
         $result = $this->redis->setex($key, $ttl, $data);
         

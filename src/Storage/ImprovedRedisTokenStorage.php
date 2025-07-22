@@ -23,7 +23,7 @@ class ImprovedRedisTokenStorage implements TokenStorageInterface
         ContainerInterface $container, 
         string $keyPrefix = 'doudian:token:',
         int $defaultTtl = 7200,
-        int $bufferTime = 86400,
+        int $bufferTime = 86400*14,
         string $connection = 'default'
     ) {
         $redisFactory = $container->get(RedisFactory::class);
